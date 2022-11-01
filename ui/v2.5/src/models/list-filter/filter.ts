@@ -1,6 +1,7 @@
 import queryString, { ParsedQuery } from "query-string";
 import clone from "lodash-es/clone";
 import {
+    ConfigDataFragment,
   FilterMode,
   FindFilterType,
   SortDirectionEnum,
@@ -40,13 +41,16 @@ export class ListFilterModel {
   public criteria: Array<Criterion<CriterionValue>> = [];
   public randomSeed = -1;
   private defaultZoomIndex: number = 1;
+  private config: ConfigDataFragment | undefined;
 
   public constructor(
     mode: FilterMode,
+    config: ConfigDataFragment | undefined,
     defaultSort?: string,
     defaultDisplayMode?: DisplayMode,
-    defaultZoomIndex?: number
+    defaultZoomIndex?: number,
   ) {
+    this.config = config;
     this.mode = mode;
     this.sortBy = defaultSort;
     if (defaultDisplayMode !== undefined) this.displayMode = defaultDisplayMode;
@@ -57,7 +61,7 @@ export class ListFilterModel {
   }
 
   public clone() {
-    return Object.assign(new ListFilterModel(this.mode), this);
+    return Object.assign(new ListFilterModel(this.mode, this.config), this);
   }
 
   // Does not decode any URL-encoding in parameters

@@ -19,6 +19,8 @@ import {
 } from "src/models/list-filter/criteria/criterion";
 import { GalleriesCriterion } from "src/models/list-filter/criteria/galleries";
 import { PhashCriterion } from "src/models/list-filter/criteria/phash";
+import React from "react";
+import { ConfigurationContext } from "../hooks/Config";
 
 function addExtraCriteria(
   dest: Criterion<CriterionValue>[],
@@ -34,7 +36,8 @@ const makePerformerScenesUrl = (
   extraCriteria?: Criterion<CriterionValue>[]
 ) => {
   if (!performer.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Scenes);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Scenes, config);
   const criterion = new PerformersCriterion();
   criterion.value = [
     { id: performer.id, label: performer.name || `Performer ${performer.id}` },
@@ -49,7 +52,8 @@ const makePerformerImagesUrl = (
   extraCriteria?: Criterion<CriterionValue>[]
 ) => {
   if (!performer.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Images);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Images, config);
   const criterion = new PerformersCriterion();
   criterion.value = [
     { id: performer.id, label: performer.name || `Performer ${performer.id}` },
@@ -64,7 +68,8 @@ const makePerformerGalleriesUrl = (
   extraCriteria?: Criterion<CriterionValue>[]
 ) => {
   if (!performer.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Galleries);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Galleries, config);
   const criterion = new PerformersCriterion();
   criterion.value = [
     { id: performer.id, label: performer.name || `Performer ${performer.id}` },
@@ -79,7 +84,8 @@ const makePerformerMoviesUrl = (
   extraCriteria?: Criterion<CriterionValue>[]
 ) => {
   if (!performer.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Movies);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Movies, config);
   const criterion = new PerformersCriterion();
   criterion.value = [
     { id: performer.id, label: performer.name || `Performer ${performer.id}` },
@@ -93,7 +99,8 @@ const makePerformersCountryUrl = (
   performer: Partial<GQL.PerformerDataFragment>
 ) => {
   if (!performer.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Performers);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Performers, config);
   const criterion = new CountryCriterion();
   criterion.value = `${performer.country}`;
   filter.criteria.push(criterion);
@@ -102,7 +109,8 @@ const makePerformersCountryUrl = (
 
 const makeStudioScenesUrl = (studio: Partial<GQL.StudioDataFragment>) => {
   if (!studio.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Scenes);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Scenes, config);
   const criterion = new StudiosCriterion();
   criterion.value = {
     items: [{ id: studio.id, label: studio.name || `Studio ${studio.id}` }],
@@ -114,7 +122,8 @@ const makeStudioScenesUrl = (studio: Partial<GQL.StudioDataFragment>) => {
 
 const makeStudioImagesUrl = (studio: Partial<GQL.StudioDataFragment>) => {
   if (!studio.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Images);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Images, config);
   const criterion = new StudiosCriterion();
   criterion.value = {
     items: [{ id: studio.id, label: studio.name || `Studio ${studio.id}` }],
@@ -126,7 +135,8 @@ const makeStudioImagesUrl = (studio: Partial<GQL.StudioDataFragment>) => {
 
 const makeStudioGalleriesUrl = (studio: Partial<GQL.StudioDataFragment>) => {
   if (!studio.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Galleries);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Galleries, config);
   const criterion = new StudiosCriterion();
   criterion.value = {
     items: [{ id: studio.id, label: studio.name || `Studio ${studio.id}` }],
@@ -138,7 +148,8 @@ const makeStudioGalleriesUrl = (studio: Partial<GQL.StudioDataFragment>) => {
 
 const makeStudioMoviesUrl = (studio: Partial<GQL.StudioDataFragment>) => {
   if (!studio.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Movies);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Movies, config);
   const criterion = new StudiosCriterion();
   criterion.value = {
     items: [{ id: studio.id, label: studio.name || `Studio ${studio.id}` }],
@@ -150,7 +161,8 @@ const makeStudioMoviesUrl = (studio: Partial<GQL.StudioDataFragment>) => {
 
 const makeChildStudiosUrl = (studio: Partial<GQL.StudioDataFragment>) => {
   if (!studio.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Studios);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Studios, config);
   const criterion = new ParentStudiosCriterion();
   criterion.value = [
     { id: studio.id, label: studio.name || `Studio ${studio.id}` },
@@ -161,7 +173,8 @@ const makeChildStudiosUrl = (studio: Partial<GQL.StudioDataFragment>) => {
 
 const makeMovieScenesUrl = (movie: Partial<GQL.MovieDataFragment>) => {
   if (!movie.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Scenes);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Scenes, config);
   const criterion = new MoviesCriterion();
   criterion.value = [
     { id: movie.id, label: movie.name || `Movie ${movie.id}` },
@@ -172,7 +185,8 @@ const makeMovieScenesUrl = (movie: Partial<GQL.MovieDataFragment>) => {
 
 const makeParentTagsUrl = (tag: Partial<GQL.TagDataFragment>) => {
   if (!tag.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Tags);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Tags, config);
   const criterion = new TagsCriterion(ChildTagsCriterionOption);
   criterion.value = {
     items: [
@@ -189,7 +203,8 @@ const makeParentTagsUrl = (tag: Partial<GQL.TagDataFragment>) => {
 
 const makeChildTagsUrl = (tag: Partial<GQL.TagDataFragment>) => {
   if (!tag.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Tags);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Tags, config);
   const criterion = new TagsCriterion(ParentTagsCriterionOption);
   criterion.value = {
     items: [
@@ -206,7 +221,8 @@ const makeChildTagsUrl = (tag: Partial<GQL.TagDataFragment>) => {
 
 const makeTagScenesUrl = (tag: Partial<GQL.TagDataFragment>) => {
   if (!tag.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Scenes);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Scenes, config);
   const criterion = new TagsCriterion(TagsCriterionOption);
   criterion.value = {
     items: [{ id: tag.id, label: tag.name || `Tag ${tag.id}` }],
@@ -218,7 +234,8 @@ const makeTagScenesUrl = (tag: Partial<GQL.TagDataFragment>) => {
 
 const makeTagPerformersUrl = (tag: Partial<GQL.TagDataFragment>) => {
   if (!tag.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Performers);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Performers, config);
   const criterion = new TagsCriterion(TagsCriterionOption);
   criterion.value = {
     items: [{ id: tag.id, label: tag.name || `Tag ${tag.id}` }],
@@ -230,7 +247,8 @@ const makeTagPerformersUrl = (tag: Partial<GQL.TagDataFragment>) => {
 
 const makeTagSceneMarkersUrl = (tag: Partial<GQL.TagDataFragment>) => {
   if (!tag.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.SceneMarkers);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.SceneMarkers, config);
   const criterion = new TagsCriterion(TagsCriterionOption);
   criterion.value = {
     items: [{ id: tag.id, label: tag.name || `Tag ${tag.id}` }],
@@ -242,7 +260,8 @@ const makeTagSceneMarkersUrl = (tag: Partial<GQL.TagDataFragment>) => {
 
 const makeTagGalleriesUrl = (tag: Partial<GQL.TagDataFragment>) => {
   if (!tag.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Galleries);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Galleries, config);
   const criterion = new TagsCriterion(TagsCriterionOption);
   criterion.value = {
     items: [{ id: tag.id, label: tag.name || `Tag ${tag.id}` }],
@@ -254,7 +273,8 @@ const makeTagGalleriesUrl = (tag: Partial<GQL.TagDataFragment>) => {
 
 const makeTagImagesUrl = (tag: Partial<GQL.TagDataFragment>) => {
   if (!tag.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Images);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Images, config);
   const criterion = new TagsCriterion(TagsCriterionOption);
   criterion.value = {
     items: [{ id: tag.id, label: tag.name || `Tag ${tag.id}` }],
@@ -273,7 +293,8 @@ const makeSceneMarkerUrl = (
 
 const makeScenesPHashMatchUrl = (phash: GQL.Maybe<string> | undefined) => {
   if (!phash) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Scenes);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Scenes, config);
   const criterion = new PhashCriterion();
   criterion.value = phash;
   filter.criteria.push(criterion);
@@ -285,7 +306,8 @@ const makeGalleryImagesUrl = (
   extraCriteria?: Criterion<CriterionValue>[]
 ) => {
   if (!gallery.id) return "#";
-  const filter = new ListFilterModel(GQL.FilterMode.Images);
+  const { configuration: config } = React.useContext(ConfigurationContext);
+  const filter = new ListFilterModel(GQL.FilterMode.Images, config);
   const criterion = new GalleriesCriterion();
   criterion.value = [
     { id: gallery.id, label: gallery.title || `Gallery ${gallery.id}` },

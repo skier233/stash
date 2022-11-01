@@ -62,6 +62,7 @@ import {
 import { AddFilterDialog } from "src/components/List/AddFilterDialog";
 import { TextUtils } from "src/utils";
 import { FormattedNumber } from "react-intl";
+import { ConfigurationContext } from "./Config";
 
 const getSelectedData = <I extends IDataItem>(
   result: I[],
@@ -588,9 +589,11 @@ const useList = <QueryResult extends IQueryResult, QueryData extends IDataItem>(
 
   const defaultSort = options.defaultSort ?? filterOptions.defaultSortBy;
   const defaultDisplayMode = filterOptions.displayModeOptions[0];
+  const { configuration: config } = React.useContext(ConfigurationContext);
   const createNewFilter = useCallback(() => {
     const filter = new ListFilterModel(
       options.filterMode,
+      config,
       defaultSort,
       defaultDisplayMode,
       options.defaultZoomIndex

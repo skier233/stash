@@ -8,6 +8,7 @@ import {
 import * as GQL from "src/core/generated-graphql";
 import { useFindSavedFilter } from "src/core/StashService";
 import { ListFilterModel } from "src/models/list-filter/filter";
+import { ConfigurationContext } from "../../hooks/Config";
 import { GalleryRecommendationRow } from "../Galleries/GalleryRecommendationRow";
 import { ImageRecommendationRow } from "../Images/ImageRecommendationRow";
 import { MovieRecommendationRow } from "../Movies/MovieRecommendationRow";
@@ -104,8 +105,8 @@ const SavedFilterResults: React.FC<ISavedFilterResults> = ({
     if (!data?.findSavedFilter) return;
 
     const { mode, filter: filterJSON } = data.findSavedFilter;
-
-    const ret = new ListFilterModel(mode);
+    const { configuration: config } = React.useContext(ConfigurationContext);
+    const ret = new ListFilterModel(mode, config);
     ret.currentPage = 1;
     ret.configureFromJSON(filterJSON);
     ret.randomSeed = -1;
@@ -132,7 +133,8 @@ const CustomFilterResults: React.FC<ICustomFilterProps> = ({
 
   const filter = useMemo(() => {
     const itemsPerPage = 25;
-    const ret = new ListFilterModel(customFilter.mode);
+    const { configuration: config } = React.useContext(ConfigurationContext);
+    const ret = new ListFilterModel(customFilter.mode, config);
     ret.sortBy = customFilter.sortBy;
     ret.sortDirection = customFilter.direction;
     ret.itemsPerPage = itemsPerPage;
