@@ -515,8 +515,9 @@ const SceneLoader: React.FC = () => {
     configuration?.interface.showScrubber ?? true
   );
 
+  const { configuration: config } = React.useContext(ConfigurationContext);
   const sceneQueue = useMemo(
-    () => SceneQueue.fromQueryParameters(location.search),
+    () => SceneQueue.fromQueryParameters(location.search, config),
     [location.search]
   );
   const [queueScenes, setQueueScenes] = useState<QueuedScene[]>([]);

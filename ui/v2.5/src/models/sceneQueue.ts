@@ -1,6 +1,6 @@
 import queryString from "query-string";
 import { RouteComponentProps } from "react-router-dom";
-import { FilterMode, Scene } from "src/core/generated-graphql";
+import { ConfigDataFragment, FilterMode, Scene } from "src/core/generated-graphql";
 import { ListFilterModel } from "./list-filter/filter";
 import { SceneListFilterOptions } from "./list-filter/scenes";
 
@@ -77,7 +77,7 @@ export class SceneQueue {
     return "";
   }
 
-  public static fromQueryParameters(params: string) {
+  public static fromQueryParameters(params: string, config: ConfigDataFragment | undefined) {
     const ret = new SceneQueue();
     const parsed = queryString.parse(params, { decode: false });
     const translated = {
@@ -92,6 +92,7 @@ export class SceneQueue {
       const decoded = ListFilterModel.decodeQueryParameters(translated);
       const query = new ListFilterModel(
         FilterMode.Scenes,
+        config,
         SceneListFilterOptions.defaultSortBy
       );
       query.configureFromQueryParameters(decoded);
