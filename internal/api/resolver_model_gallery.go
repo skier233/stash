@@ -177,6 +177,30 @@ func (r *galleryResolver) Date(ctx context.Context, obj *models.Gallery) (*strin
 	return nil, nil
 }
 
+func (r *galleryResolver) Checksum(ctx context.Context, obj *models.Gallery) (string, error) {
+	if !obj.Files.PrimaryLoaded() {
+		if err := r.withTxn(ctx, func(ctx context.Context) error {
+			return obj.LoadPrimaryFile(ctx, r.repository.File)
+		}); err != nil {
+			return "", err
+		}
+	}
+
+	return obj.PrimaryChecksum(), nil
+}
+
+func (r *galleryResolver) Rating(ctx context.Context, obj *models.Gallery) (*int, error) {
+	if obj.Rating != nil {
+		rating := models.Rating100To5(*obj.Rating)
+		return &rating, nil
+	}
+	return nil, nil
+}
+
+func (r *galleryResolver) Rating100(ctx context.Context, obj *models.Gallery) (*int, error) {
+	return obj.Rating, nil
+}
+
 func (r *galleryResolver) Scenes(ctx context.Context, obj *models.Gallery) (ret []*models.Scene, err error) {
 	if !obj.SceneIDs.Loaded() {
 		if err := r.withTxn(ctx, func(ctx context.Context) error {

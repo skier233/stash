@@ -467,6 +467,10 @@ func (me *contentDirectoryService) getVideos(sceneFilter *models.SceneFilterType
 			}
 		} else {
 			for _, s := range scenes {
+				if err := s.LoadPrimaryFile(ctx, me.repository.FileFinder); err != nil {
+					return err
+				}
+
 				objs = append(objs, sceneToContainer(s, parentID, host))
 			}
 		}
@@ -489,7 +493,7 @@ func (me *contentDirectoryService) getPageVideos(sceneFilter *models.SceneFilter
 		}
 
 		var err error
-		objs, err = pager.getPageVideos(ctx, me.repository.SceneFinder, page, host)
+		objs, err = pager.getPageVideos(ctx, me.repository.SceneFinder, me.repository.FileFinder, page, host)
 		if err != nil {
 			return err
 		}
@@ -608,7 +612,7 @@ func (me *contentDirectoryService) getPerformers() []interface{} {
 		}
 
 		for _, s := range performers {
-			objs = append(objs, makeStorageFolder("performers/"+strconv.Itoa(s.ID), s.Name.String, "performers"))
+			objs = append(objs, makeStorageFolder("performers/"+strconv.Itoa(s.ID), s.Name, "performers"))
 		}
 
 		return nil

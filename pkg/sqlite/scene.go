@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -53,23 +52,28 @@ ORDER BY files.size DESC
 `
 
 type sceneRow struct {
-	ID        int               `db:"id" goqu:"skipinsert"`
-	Title     zero.String       `db:"title"`
-	Details   zero.String       `db:"details"`
-	URL       zero.String       `db:"url"`
-	Date      models.SQLiteDate `db:"date"`
-	Rating    null.Int          `db:"rating"`
-	Organized bool              `db:"organized"`
-	OCounter  int               `db:"o_counter"`
-	StudioID  null.Int          `db:"studio_id,omitempty"`
-	CreatedAt time.Time         `db:"created_at"`
-	UpdatedAt time.Time         `db:"updated_at"`
+	ID       int               `db:"id" goqu:"skipinsert"`
+	Title    zero.String       `db:"title"`
+	Code     zero.String       `db:"code"`
+	Details  zero.String       `db:"details"`
+	Director zero.String       `db:"director"`
+	URL      zero.String       `db:"url"`
+	Date     models.SQLiteDate `db:"date"`
+	// expressed as 1-100
+	Rating    null.Int               `db:"rating"`
+	Organized bool                   `db:"organized"`
+	OCounter  int                    `db:"o_counter"`
+	StudioID  null.Int               `db:"studio_id,omitempty"`
+	CreatedAt models.SQLiteTimestamp `db:"created_at"`
+	UpdatedAt models.SQLiteTimestamp `db:"updated_at"`
 }
 
 func (r *sceneRow) fromScene(o models.Scene) {
 	r.ID = o.ID
 	r.Title = zero.StringFrom(o.Title)
+	r.Code = zero.StringFrom(o.Code)
 	r.Details = zero.StringFrom(o.Details)
+	r.Director = zero.StringFrom(o.Director)
 	r.URL = zero.StringFrom(o.URL)
 	if o.Date != nil {
 		_ = r.Date.Scan(o.Date.Time)
@@ -78,8 +82,8 @@ func (r *sceneRow) fromScene(o models.Scene) {
 	r.Organized = o.Organized
 	r.OCounter = o.OCounter
 	r.StudioID = intFromPtr(o.StudioID)
-	r.CreatedAt = o.CreatedAt
-	r.UpdatedAt = o.UpdatedAt
+	r.CreatedAt = models.SQLiteTimestamp{Timestamp: o.CreatedAt}
+	r.UpdatedAt = models.SQLiteTimestamp{Timestamp: o.UpdatedAt}
 }
 
 type sceneQueryRow struct {
@@ -95,7 +99,9 @@ func (r *sceneQueryRow) resolve() *models.Scene {
 	ret := &models.Scene{
 		ID:        r.ID,
 		Title:     r.Title.String,
+		Code:      r.Code.String,
 		Details:   r.Details.String,
+		Director:  r.Director.String,
 		URL:       r.URL.String,
 		Date:      r.Date.DatePtr(),
 		Rating:    nullIntPtr(r.Rating),
@@ -107,8 +113,8 @@ func (r *sceneQueryRow) resolve() *models.Scene {
 		OSHash:        r.PrimaryFileOshash.String,
 		Checksum:      r.PrimaryFileChecksum.String,
 
-		CreatedAt: r.CreatedAt,
-		UpdatedAt: r.UpdatedAt,
+		CreatedAt: r.CreatedAt.Timestamp,
+		UpdatedAt: r.UpdatedAt.Timestamp,
 	}
 
 	if r.PrimaryFileFolderPath.Valid && r.PrimaryFileBasename.Valid {
@@ -124,15 +130,17 @@ type sceneRowRecord struct {
 
 func (r *sceneRowRecord) fromPartial(o models.ScenePartial) {
 	r.setNullString("title", o.Title)
+	r.setNullString("code", o.Code)
 	r.setNullString("details", o.Details)
+	r.setNullString("director", o.Director)
 	r.setNullString("url", o.URL)
 	r.setSQLiteDate("date", o.Date)
 	r.setNullInt("rating", o.Rating)
 	r.setBool("organized", o.Organized)
 	r.setInt("o_counter", o.OCounter)
 	r.setNullInt("studio_id", o.StudioID)
-	r.setTime("created_at", o.CreatedAt)
-	r.setTime("updated_at", o.UpdatedAt)
+	r.setSQLiteTimestamp("created_at", o.CreatedAt)
+	r.setSQLiteTimestamp("updated_at", o.UpdatedAt)
 }
 
 type SceneStore struct {
@@ -318,12 +326,6 @@ func (qb *SceneStore) Update(ctx context.Context, updatedObject *models.Scene) e
 }
 
 func (qb *SceneStore) Destroy(ctx context.Context, id int) error {
-	// delete all related table rows
-	// TODO - this should be handled by a delete cascade
-	if err := qb.performersRepository().destroy(ctx, []int{id}); err != nil {
-		return err
-	}
-
 	// scene markers should be handled prior to calling destroy
 	// galleries should be handled prior to calling destroy
 
@@ -485,6 +487,20 @@ func (qb *SceneStore) FindByFileID(ctx context.Context, fileID file.ID) ([]*mode
 	ret, err := qb.findBySubquery(ctx, sq)
 	if err != nil {
 		return nil, fmt.Errorf("getting scenes by file id %d: %w", fileID, err)
+	}
+
+	return ret, nil
+}
+
+func (qb *SceneStore) FindByPrimaryFileID(ctx context.Context, fileID file.ID) ([]*models.Scene, error) {
+	sq := dialect.From(scenesFilesJoinTable).Select(scenesFilesJoinTable.Col(sceneIDColumn)).Where(
+		scenesFilesJoinTable.Col(fileIDColumn).Eq(fileID),
+		scenesFilesJoinTable.Col("primary").Eq(1),
+	)
+
+	ret, err := qb.findBySubquery(ctx, sq)
+	if err != nil {
+		return nil, fmt.Errorf("getting scenes by primary file id %d: %w", fileID, err)
 	}
 
 	return ret, nil
@@ -791,10 +807,13 @@ func (qb *SceneStore) makeFilter(ctx context.Context, sceneFilter *models.SceneF
 		query.not(qb.makeFilter(ctx, sceneFilter.Not))
 	}
 
+	query.handleCriterion(ctx, intCriterionHandler(sceneFilter.ID, "scenes.id", nil))
 	query.handleCriterion(ctx, pathCriterionHandler(sceneFilter.Path, "folders.path", "files.basename", qb.addFoldersTable))
 	query.handleCriterion(ctx, sceneFileCountCriterionHandler(qb, sceneFilter.FileCount))
 	query.handleCriterion(ctx, stringCriterionHandler(sceneFilter.Title, "scenes.title"))
+	query.handleCriterion(ctx, stringCriterionHandler(sceneFilter.Code, "scenes.code"))
 	query.handleCriterion(ctx, stringCriterionHandler(sceneFilter.Details, "scenes.details"))
+	query.handleCriterion(ctx, stringCriterionHandler(sceneFilter.Director, "scenes.director"))
 	query.handleCriterion(ctx, criterionHandlerFunc(func(ctx context.Context, f *filterBuilder) {
 		if sceneFilter.Oshash != nil {
 			qb.addSceneFilesTable(f)
@@ -826,7 +845,9 @@ func (qb *SceneStore) makeFilter(ctx context.Context, sceneFilter *models.SceneF
 		}
 	}))
 
-	query.handleCriterion(ctx, intCriterionHandler(sceneFilter.Rating, "scenes.rating", nil))
+	query.handleCriterion(ctx, intCriterionHandler(sceneFilter.Rating100, "scenes.rating", nil))
+	// legacy rating handler
+	query.handleCriterion(ctx, rating5CriterionHandler(sceneFilter.Rating, "scenes.rating", nil))
 	query.handleCriterion(ctx, intCriterionHandler(sceneFilter.OCounter, "scenes.o_counter", nil))
 	query.handleCriterion(ctx, boolCriterionHandler(sceneFilter.Organized, "scenes.organized", nil))
 
@@ -859,6 +880,9 @@ func (qb *SceneStore) makeFilter(ctx context.Context, sceneFilter *models.SceneF
 	query.handleCriterion(ctx, scenePerformerFavoriteCriterionHandler(sceneFilter.PerformerFavorite))
 	query.handleCriterion(ctx, scenePerformerAgeCriterionHandler(sceneFilter.PerformerAge))
 	query.handleCriterion(ctx, scenePhashDuplicatedCriterionHandler(sceneFilter.Duplicated, qb.addSceneFilesTable))
+	query.handleCriterion(ctx, dateCriterionHandler(sceneFilter.Date, "scenes.date"))
+	query.handleCriterion(ctx, timestampCriterionHandler(sceneFilter.CreatedAt, "scenes.created_at"))
+	query.handleCriterion(ctx, timestampCriterionHandler(sceneFilter.UpdatedAt, "scenes.updated_at"))
 
 	return query
 }
@@ -920,7 +944,8 @@ func (qb *SceneStore) Query(ctx context.Context, options models.SceneQueryOption
 			},
 		)
 
-		searchColumns := []string{"scenes.title", "scenes.details", "folders.path", "files.basename", "files_fingerprints.fingerprint", "scene_markers.title"}
+		filepathColumn := "folders.path || '" + string(filepath.Separator) + "' || files.basename"
+		searchColumns := []string{"scenes.title", "scenes.details", filepathColumn, "files_fingerprints.fingerprint", "scene_markers.title"}
 		query.parseQueryString(searchColumns, *q)
 	}
 
@@ -957,7 +982,7 @@ func (qb *SceneStore) queryGroupedFields(ctx context.Context, options models.Sce
 	aggregateQuery := qb.newQuery()
 
 	if options.Count {
-		aggregateQuery.addColumn("COUNT(temp.id) as total")
+		aggregateQuery.addColumn("COUNT(DISTINCT temp.id) as total")
 	}
 
 	if options.TotalDuration {
@@ -1245,7 +1270,6 @@ func sceneStudioCriterionHandler(qb *SceneStore, studios *models.HierarchicalMul
 		primaryTable: sceneTable,
 		foreignTable: studioTable,
 		foreignFK:    studioIDColumn,
-		derivedTable: "studio",
 		parentFK:     "parent_id",
 	}
 
@@ -1325,6 +1349,15 @@ func (qb *SceneStore) setSceneSort(query *queryBuilder, findFilter *models.FindF
 		)
 	}
 
+	addFolderTable := func() {
+		query.addJoins(
+			join{
+				table:    folderTable,
+				onClause: "files.parent_folder_id = folders.id",
+			},
+		)
+	}
+
 	direction := findFilter.GetDirection()
 	switch sort {
 	case "movie_scene_number":
@@ -1339,12 +1372,7 @@ func (qb *SceneStore) setSceneSort(query *queryBuilder, findFilter *models.FindF
 	case "path":
 		// special handling for path
 		addFileTable()
-		query.addJoins(
-			join{
-				table:    folderTable,
-				onClause: "files.parent_folder_id = folders.id",
-			},
-		)
+		addFolderTable()
 		query.sortAndPagination += fmt.Sprintf(" ORDER BY folders.path %s, files.basename %[1]s", direction)
 	case "perceptual_similarity":
 		// special handling for phash
@@ -1379,6 +1407,10 @@ func (qb *SceneStore) setSceneSort(query *queryBuilder, findFilter *models.FindF
 	case "interactive", "interactive_speed":
 		addVideoFileTable()
 		query.sortAndPagination += getSort(sort, direction, videoFileTable)
+	case "title":
+		addFileTable()
+		addFolderTable()
+		query.sortAndPagination += " ORDER BY scenes.title COLLATE NATURAL_CS " + direction + ", folders.path " + direction + ", files.basename COLLATE NATURAL_CS " + direction
 	default:
 		query.sortAndPagination += getSort(sort, direction, "scenes")
 	}
@@ -1405,6 +1437,22 @@ func (qb *SceneStore) UpdateCover(ctx context.Context, sceneID int, image []byte
 
 func (qb *SceneStore) DestroyCover(ctx context.Context, sceneID int) error {
 	return qb.imageRepository().destroy(ctx, []int{sceneID})
+}
+
+func (qb *SceneStore) AssignFiles(ctx context.Context, sceneID int, fileIDs []file.ID) error {
+	// assuming a file can only be assigned to a single scene
+	if err := scenesFilesTableMgr.destroyJoins(ctx, fileIDs); err != nil {
+		return err
+	}
+
+	// assign primary only if destination has no files
+	existingFileIDs, err := qb.filesRepository().get(ctx, sceneID)
+	if err != nil {
+		return err
+	}
+
+	firstPrimary := len(existingFileIDs) == 0
+	return scenesFilesTableMgr.insertJoins(ctx, sceneID, firstPrimary, fileIDs)
 }
 
 func (qb *SceneStore) moviesRepository() *repository {
@@ -1470,7 +1518,9 @@ func (qb *SceneStore) tagsRepository() *joinRepository {
 			tableName: scenesTagsTable,
 			idColumn:  sceneIDColumn,
 		},
-		fkColumn: tagIDColumn,
+		fkColumn:     tagIDColumn,
+		foreignTable: tagTable,
+		orderBy:      "tags.name ASC",
 	}
 }
 

@@ -2,7 +2,10 @@ type Image {
   id: ID!
   checksum: String @deprecated(reason: "Use files.fingerprints")
   title: String
-  rating: Int
+  # rating expressed as 1-5
+  rating: Int @deprecated(reason: "Use 1-100 range with rating100")
+  # rating expressed as 1-100
+  rating100: Int
   o_counter: Int
   organized: Boolean!
   path: String! @deprecated(reason: "Use files.path")
@@ -37,20 +40,28 @@ input ImageUpdateInput {
   clientMutationId: String
   id: ID!
   title: String
-  rating: Int
+  # rating expressed as 1-5
+  rating: Int @deprecated(reason: "Use 1-100 range with rating100")
+  # rating expressed as 1-100
+  rating100: Int
   organized: Boolean
   
   studio_id: ID
   performer_ids: [ID!]
   tag_ids: [ID!]
   gallery_ids: [ID!]
+
+  primary_file_id: ID
 }
 
 input BulkImageUpdateInput {
   clientMutationId: String
   ids: [ID!]
   title: String
-  rating: Int
+  # rating expressed as 1-5
+  rating: Int @deprecated(reason: "Use 1-100 range with rating100")
+  # rating expressed as 1-100
+  rating100: Int
   organized: Boolean
   
   studio_id: ID

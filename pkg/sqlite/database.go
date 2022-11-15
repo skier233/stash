@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -21,7 +22,7 @@ import (
 	"github.com/stashapp/stash/pkg/logger"
 )
 
-var appSchemaVersion uint = 32
+var appSchemaVersion uint = 40
 
 //go:embed migrations/*.sql
 var migrationsBox embed.FS
@@ -60,11 +61,12 @@ func init() {
 }
 
 type Database struct {
-	File    *FileStore
-	Folder  *FolderStore
-	Image   *ImageStore
-	Gallery *GalleryStore
-	Scene   *SceneStore
+	File      *FileStore
+	Folder    *FolderStore
+	Image     *ImageStore
+	Gallery   *GalleryStore
+	Scene     *SceneStore
+	Performer *PerformerStore
 
 	db     *sqlx.DB
 	dbPath string
@@ -79,11 +81,12 @@ func NewDatabase() *Database {
 	folderStore := NewFolderStore()
 
 	ret := &Database{
-		File:    fileStore,
-		Folder:  folderStore,
-		Scene:   NewSceneStore(fileStore),
-		Image:   NewImageStore(fileStore),
-		Gallery: NewGalleryStore(fileStore, folderStore),
+		File:      fileStore,
+		Folder:    folderStore,
+		Scene:     NewSceneStore(fileStore),
+		Image:     NewImageStore(fileStore),
+		Gallery:   NewGalleryStore(fileStore, folderStore),
+		Performer: NewPerformerStore(),
 	}
 
 	return ret
@@ -253,8 +256,14 @@ func (db *Database) DatabasePath() string {
 	return db.dbPath
 }
 
-func (db *Database) DatabaseBackupPath() string {
-	return fmt.Sprintf("%s.%d.%s", db.dbPath, db.schemaVersion, time.Now().Format("20060102_150405"))
+func (db *Database) DatabaseBackupPath(backupDirectoryPath string) string {
+	fn := fmt.Sprintf("%s.%d.%s", filepath.Base(db.dbPath), db.schemaVersion, time.Now().Format("20060102_150405"))
+
+	if backupDirectoryPath != "" {
+		return filepath.Join(backupDirectoryPath, fn)
+	}
+
+	return fn
 }
 
 func (db *Database) Version() uint {
@@ -346,8 +355,12 @@ func (db *Database) RunMigrations() error {
 		return fmt.Errorf("re-initializing the database: %w", err)
 	}
 
-	// run a vacuum on the database
-	logger.Info("Performing vacuum on database")
+	// optimize database after migration
+	logger.Info("Optimizing database")
+	_, err = db.db.Exec("ANALYZE")
+	if err != nil {
+		logger.Warnf("error while performing post-migration optimization: %v", err)
+	}
 	_, err = db.db.Exec("VACUUM")
 	if err != nil {
 		logger.Warnf("error while performing post-migration vacuum: %v", err)

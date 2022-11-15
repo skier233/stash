@@ -179,21 +179,23 @@ func (t *joinTable) get(ctx context.Context, id int) ([]int, error) {
 	return ret, nil
 }
 
-func (t *joinTable) insertJoin(ctx context.Context, id, foreignID int) (sql.Result, error) {
-	q := dialect.Insert(t.table.table).Cols(t.idColumn.GetCol(), t.fkColumn.GetCol()).Vals(
-		goqu.Vals{id, foreignID},
-	)
-	ret, err := exec(ctx, q)
-	if err != nil {
-		return nil, fmt.Errorf("inserting into %s: %w", t.table.table.GetTable(), err)
-	}
-
-	return ret, nil
-}
-
 func (t *joinTable) insertJoins(ctx context.Context, id int, foreignIDs []int) error {
+	// manually create SQL so that we can prepare once
+	// ignore duplicates
+	q := fmt.Sprintf("INSERT INTO %s (%s, %s) VALUES (?, ?) ON CONFLICT (%[2]s, %s) DO NOTHING", t.table.table.GetTable(), t.idColumn.GetCol(), t.fkColumn.GetCol())
+
+	tx := dbWrapper{}
+	stmt, err := tx.Prepare(ctx, q)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	// eliminate duplicates
+	foreignIDs = intslice.IntAppendUniques(nil, foreignIDs)
+
 	for _, fk := range foreignIDs {
-		if _, err := t.insertJoin(ctx, id, fk); err != nil {
+		if _, err := tx.ExecStmt(ctx, stmt, id, fk); err != nil {
 			return err
 		}
 	}
@@ -442,11 +444,16 @@ func (t *scenesMoviesTable) addJoins(ctx context.Context, id int, v []models.Mov
 	// only add values that are not already present
 	var filtered []models.MoviesScenes
 	for _, vv := range v {
+		found := false
+
 		for _, e := range fks {
 			if vv.MovieID == e.MovieID {
-				continue
+				found = true
+				break
 			}
+		}
 
+		if !found {
 			filtered = append(filtered, vv)
 		}
 	}
@@ -520,6 +527,17 @@ func (t *relatedFilesTable) replaceJoins(ctx context.Context, id int, fileIDs []
 
 	const firstPrimary = true
 	return t.insertJoins(ctx, id, firstPrimary, fileIDs)
+}
+
+// destroyJoins destroys all entries in the table with the provided fileIDs
+func (t *relatedFilesTable) destroyJoins(ctx context.Context, fileIDs []file.ID) error {
+	q := dialect.Delete(t.table.table).Where(t.table.table.Col("file_id").In(fileIDs))
+
+	if _, err := exec(ctx, q); err != nil {
+		return fmt.Errorf("destroying file joins in %s: %w", t.table.table.GetTable(), err)
+	}
+
+	return nil
 }
 
 func (t *relatedFilesTable) setPrimary(ctx context.Context, id int, fileID file.ID) error {

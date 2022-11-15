@@ -54,7 +54,7 @@ func Test_galleryQueryBuilder_Create(t *testing.T) {
 	var (
 		title     = "title"
 		url       = "url"
-		rating    = 3
+		rating    = 60
 		details   = "details"
 		createdAt = time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
 		updatedAt = time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -82,7 +82,7 @@ func Test_galleryQueryBuilder_Create(t *testing.T) {
 				CreatedAt:    createdAt,
 				UpdatedAt:    updatedAt,
 				SceneIDs:     models.NewRelatedIDs([]int{sceneIDs[sceneIdx1WithPerformer], sceneIDs[sceneIdx1WithStudio]}),
-				TagIDs:       models.NewRelatedIDs([]int{tagIDs[tagIdx1WithScene], tagIDs[tagIdx1WithDupName]}),
+				TagIDs:       models.NewRelatedIDs([]int{tagIDs[tagIdx1WithDupName], tagIDs[tagIdx1WithScene]}),
 				PerformerIDs: models.NewRelatedIDs([]int{performerIDs[performerIdx1WithScene], performerIDs[performerIdx1WithDupName]}),
 			},
 			false,
@@ -103,7 +103,7 @@ func Test_galleryQueryBuilder_Create(t *testing.T) {
 				CreatedAt:    createdAt,
 				UpdatedAt:    updatedAt,
 				SceneIDs:     models.NewRelatedIDs([]int{sceneIDs[sceneIdx1WithPerformer], sceneIDs[sceneIdx1WithStudio]}),
-				TagIDs:       models.NewRelatedIDs([]int{tagIDs[tagIdx1WithScene], tagIDs[tagIdx1WithDupName]}),
+				TagIDs:       models.NewRelatedIDs([]int{tagIDs[tagIdx1WithDupName], tagIDs[tagIdx1WithScene]}),
 				PerformerIDs: models.NewRelatedIDs([]int{performerIDs[performerIdx1WithScene], performerIDs[performerIdx1WithDupName]}),
 			},
 			false,
@@ -205,7 +205,7 @@ func Test_galleryQueryBuilder_Update(t *testing.T) {
 	var (
 		title     = "title"
 		url       = "url"
-		rating    = 3
+		rating    = 60
 		details   = "details"
 		createdAt = time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
 		updatedAt = time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -235,7 +235,7 @@ func Test_galleryQueryBuilder_Update(t *testing.T) {
 				CreatedAt:    createdAt,
 				UpdatedAt:    updatedAt,
 				SceneIDs:     models.NewRelatedIDs([]int{sceneIDs[sceneIdx1WithPerformer], sceneIDs[sceneIdx1WithStudio]}),
-				TagIDs:       models.NewRelatedIDs([]int{tagIDs[tagIdx1WithScene], tagIDs[tagIdx1WithDupName]}),
+				TagIDs:       models.NewRelatedIDs([]int{tagIDs[tagIdx1WithDupName], tagIDs[tagIdx1WithScene]}),
 				PerformerIDs: models.NewRelatedIDs([]int{performerIDs[performerIdx1WithScene], performerIDs[performerIdx1WithDupName]}),
 			},
 			false,
@@ -399,7 +399,7 @@ func Test_galleryQueryBuilder_UpdatePartial(t *testing.T) {
 		title     = "title"
 		details   = "details"
 		url       = "url"
-		rating    = 3
+		rating    = 60
 		createdAt = time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
 		updatedAt = time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -785,16 +785,16 @@ func Test_galleryQueryBuilder_UpdatePartialRelationships(t *testing.T) {
 
 			// only compare fields that were in the partial
 			if tt.partial.PerformerIDs != nil {
-				assert.Equal(tt.want.PerformerIDs, got.PerformerIDs)
-				assert.Equal(tt.want.PerformerIDs, s.PerformerIDs)
+				assert.ElementsMatch(tt.want.PerformerIDs.List(), got.PerformerIDs.List())
+				assert.ElementsMatch(tt.want.PerformerIDs.List(), s.PerformerIDs.List())
 			}
 			if tt.partial.TagIDs != nil {
-				assert.Equal(tt.want.TagIDs, got.TagIDs)
-				assert.Equal(tt.want.TagIDs, s.TagIDs)
+				assert.ElementsMatch(tt.want.TagIDs.List(), got.TagIDs.List())
+				assert.ElementsMatch(tt.want.TagIDs.List(), s.TagIDs.List())
 			}
 			if tt.partial.SceneIDs != nil {
-				assert.Equal(tt.want.SceneIDs, got.SceneIDs)
-				assert.Equal(tt.want.SceneIDs, s.SceneIDs)
+				assert.ElementsMatch(tt.want.SceneIDs.List(), got.SceneIDs.List())
+				assert.ElementsMatch(tt.want.SceneIDs.List(), s.SceneIDs.List())
 			}
 		})
 	}
@@ -1547,7 +1547,7 @@ func TestGalleryQueryPathAndRating(t *testing.T) {
 			Modifier: models.CriterionModifierEquals,
 		},
 		And: &models.GalleryFilterType{
-			Rating: &models.IntCriterionInput{
+			Rating100: &models.IntCriterionInput{
 				Value:    *galleryRating,
 				Modifier: models.CriterionModifierEquals,
 			},
@@ -1588,7 +1588,7 @@ func TestGalleryQueryPathNotRating(t *testing.T) {
 	galleryFilter := models.GalleryFilterType{
 		Path: &pathCriterion,
 		Not: &models.GalleryFilterType{
-			Rating: &ratingCriterion,
+			Rating100: &ratingCriterion,
 		},
 	}
 
@@ -1699,36 +1699,84 @@ func verifyGalleryQuery(t *testing.T, filter models.GalleryFilterType, verifyFn 
 	})
 }
 
-func TestGalleryQueryRating(t *testing.T) {
+func TestGalleryQueryLegacyRating(t *testing.T) {
 	const rating = 3
 	ratingCriterion := models.IntCriterionInput{
 		Value:    rating,
 		Modifier: models.CriterionModifierEquals,
 	}
 
-	verifyGalleriesRating(t, ratingCriterion)
+	verifyGalleriesLegacyRating(t, ratingCriterion)
 
 	ratingCriterion.Modifier = models.CriterionModifierNotEquals
-	verifyGalleriesRating(t, ratingCriterion)
+	verifyGalleriesLegacyRating(t, ratingCriterion)
 
 	ratingCriterion.Modifier = models.CriterionModifierGreaterThan
-	verifyGalleriesRating(t, ratingCriterion)
+	verifyGalleriesLegacyRating(t, ratingCriterion)
 
 	ratingCriterion.Modifier = models.CriterionModifierLessThan
-	verifyGalleriesRating(t, ratingCriterion)
+	verifyGalleriesLegacyRating(t, ratingCriterion)
 
 	ratingCriterion.Modifier = models.CriterionModifierIsNull
-	verifyGalleriesRating(t, ratingCriterion)
+	verifyGalleriesLegacyRating(t, ratingCriterion)
 
 	ratingCriterion.Modifier = models.CriterionModifierNotNull
-	verifyGalleriesRating(t, ratingCriterion)
+	verifyGalleriesLegacyRating(t, ratingCriterion)
 }
 
-func verifyGalleriesRating(t *testing.T, ratingCriterion models.IntCriterionInput) {
+func verifyGalleriesLegacyRating(t *testing.T, ratingCriterion models.IntCriterionInput) {
 	withTxn(func(ctx context.Context) error {
 		sqb := db.Gallery
 		galleryFilter := models.GalleryFilterType{
 			Rating: &ratingCriterion,
+		}
+
+		galleries, _, err := sqb.Query(ctx, &galleryFilter, nil)
+		if err != nil {
+			t.Errorf("Error querying gallery: %s", err.Error())
+		}
+
+		// convert criterion value to the 100 value
+		ratingCriterion.Value = models.Rating5To100(ratingCriterion.Value)
+
+		for _, gallery := range galleries {
+			verifyIntPtr(t, gallery.Rating, ratingCriterion)
+		}
+
+		return nil
+	})
+}
+
+func TestGalleryQueryRating100(t *testing.T) {
+	const rating = 60
+	ratingCriterion := models.IntCriterionInput{
+		Value:    rating,
+		Modifier: models.CriterionModifierEquals,
+	}
+
+	verifyGalleriesRating100(t, ratingCriterion)
+
+	ratingCriterion.Modifier = models.CriterionModifierNotEquals
+	verifyGalleriesRating100(t, ratingCriterion)
+
+	ratingCriterion.Modifier = models.CriterionModifierGreaterThan
+	verifyGalleriesRating100(t, ratingCriterion)
+
+	ratingCriterion.Modifier = models.CriterionModifierLessThan
+	verifyGalleriesRating100(t, ratingCriterion)
+
+	ratingCriterion.Modifier = models.CriterionModifierIsNull
+	verifyGalleriesRating100(t, ratingCriterion)
+
+	ratingCriterion.Modifier = models.CriterionModifierNotNull
+	verifyGalleriesRating100(t, ratingCriterion)
+}
+
+func verifyGalleriesRating100(t *testing.T, ratingCriterion models.IntCriterionInput) {
+	withTxn(func(ctx context.Context) error {
+		sqb := db.Gallery
+		galleryFilter := models.GalleryFilterType{
+			Rating100: &ratingCriterion,
 		}
 
 		galleries, _, err := sqb.Query(ctx, &galleryFilter, nil)
@@ -2398,6 +2446,164 @@ func TestGalleryQuerySorting(t *testing.T) {
 			if tt.lastGalleryIdx != -1 {
 				lastID := galleryIDs[tt.lastGalleryIdx]
 				assert.Equal(lastID, lastGallery.ID)
+			}
+		})
+	}
+}
+
+func TestGalleryStore_AddImages(t *testing.T) {
+	tests := []struct {
+		name      string
+		galleryID int
+		imageIDs  []int
+		wantErr   bool
+	}{
+		{
+			"single",
+			galleryIDs[galleryIdx1WithImage],
+			[]int{imageIDs[imageIdx1WithPerformer]},
+			false,
+		},
+		{
+			"multiple",
+			galleryIDs[galleryIdx1WithImage],
+			[]int{imageIDs[imageIdx1WithPerformer], imageIDs[imageIdx1WithStudio]},
+			false,
+		},
+		{
+			"invalid gallery id",
+			invalidID,
+			[]int{imageIDs[imageIdx1WithPerformer]},
+			true,
+		},
+		{
+			"single invalid",
+			galleryIDs[galleryIdx1WithImage],
+			[]int{invalidID},
+			true,
+		},
+		{
+			"one invalid",
+			galleryIDs[galleryIdx1WithImage],
+			[]int{imageIDs[imageIdx1WithPerformer], invalidID},
+			true,
+		},
+		{
+			"existing",
+			galleryIDs[galleryIdx1WithImage],
+			[]int{imageIDs[imageIdxWithGallery]},
+			false,
+		},
+		{
+			"one new",
+			galleryIDs[galleryIdx1WithImage],
+			[]int{imageIDs[imageIdx1WithPerformer], imageIDs[imageIdxWithGallery]},
+			false,
+		},
+	}
+
+	qb := db.Gallery
+
+	for _, tt := range tests {
+		runWithRollbackTxn(t, tt.name, func(t *testing.T, ctx context.Context) {
+			if err := qb.AddImages(ctx, tt.galleryID, tt.imageIDs...); (err != nil) != tt.wantErr {
+				t.Errorf("GalleryStore.AddImages() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			// ensure image was added
+			imageIDs, err := qb.GetImageIDs(ctx, tt.galleryID)
+			if err != nil {
+				t.Errorf("GalleryStore.GetImageIDs() error = %v", err)
+				return
+			}
+
+			assert := assert.New(t)
+			for _, wantedID := range tt.imageIDs {
+				assert.Contains(imageIDs, wantedID)
+			}
+		})
+	}
+}
+
+func TestGalleryStore_RemoveImages(t *testing.T) {
+	tests := []struct {
+		name      string
+		galleryID int
+		imageIDs  []int
+		wantErr   bool
+	}{
+		{
+			"single",
+			galleryIDs[galleryIdxWithTwoImages],
+			[]int{imageIDs[imageIdx1WithGallery]},
+			false,
+		},
+		{
+			"multiple",
+			galleryIDs[galleryIdxWithTwoImages],
+			[]int{imageIDs[imageIdx1WithGallery], imageIDs[imageIdx2WithGallery]},
+			false,
+		},
+		{
+			"invalid gallery id",
+			invalidID,
+			[]int{imageIDs[imageIdx1WithGallery]},
+			false,
+		},
+		{
+			"single invalid",
+			galleryIDs[galleryIdxWithTwoImages],
+			[]int{invalidID},
+			false,
+		},
+		{
+			"one invalid",
+			galleryIDs[galleryIdxWithTwoImages],
+			[]int{imageIDs[imageIdx1WithGallery], invalidID},
+			false,
+		},
+		{
+			"not existing",
+			galleryIDs[galleryIdxWithTwoImages],
+			[]int{imageIDs[imageIdxWithPerformer]},
+			false,
+		},
+		{
+			"one existing",
+			galleryIDs[galleryIdxWithTwoImages],
+			[]int{imageIDs[imageIdx1WithPerformer], imageIDs[imageIdx1WithGallery]},
+			false,
+		},
+	}
+
+	qb := db.Gallery
+
+	for _, tt := range tests {
+		runWithRollbackTxn(t, tt.name, func(t *testing.T, ctx context.Context) {
+			if err := qb.RemoveImages(ctx, tt.galleryID, tt.imageIDs...); (err != nil) != tt.wantErr {
+				t.Errorf("GalleryStore.RemoveImages() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			// ensure image was removed
+			imageIDs, err := qb.GetImageIDs(ctx, tt.galleryID)
+			if err != nil {
+				t.Errorf("GalleryStore.GetImageIDs() error = %v", err)
+				return
+			}
+
+			assert := assert.New(t)
+			for _, excludedID := range tt.imageIDs {
+				assert.NotContains(imageIDs, excludedID)
 			}
 		})
 	}

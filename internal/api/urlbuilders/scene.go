@@ -2,6 +2,7 @@ package urlbuilders
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -19,12 +20,19 @@ func NewSceneURLBuilder(baseURL string, sceneID int) SceneURLBuilder {
 	}
 }
 
-func (b SceneURLBuilder) GetStreamURL() string {
-	var apiKeyParam string
-	if b.APIKey != "" {
-		apiKeyParam = fmt.Sprintf("?apikey=%s", b.APIKey)
+func (b SceneURLBuilder) GetStreamURL() *url.URL {
+	u, err := url.Parse(fmt.Sprintf("%s/scene/%s/stream", b.BaseURL, b.SceneID))
+	if err != nil {
+		// shouldn't happen
+		panic(err)
 	}
-	return fmt.Sprintf("%s/scene/%s/stream%s", b.BaseURL, b.SceneID, apiKeyParam)
+
+	if b.APIKey != "" {
+		v := u.Query()
+		v.Set("apikey", b.APIKey)
+		u.RawQuery = v.Encode()
+	}
+	return u
 }
 
 func (b SceneURLBuilder) GetStreamPreviewURL() string {
@@ -45,10 +53,6 @@ func (b SceneURLBuilder) GetSpriteURL() string {
 
 func (b SceneURLBuilder) GetScreenshotURL(updateTime time.Time) string {
 	return b.BaseURL + "/scene/" + b.SceneID + "/screenshot?" + strconv.FormatInt(updateTime.Unix(), 10)
-}
-
-func (b SceneURLBuilder) GetChaptersVTTURL() string {
-	return b.BaseURL + "/scene/" + b.SceneID + "/vtt/chapter"
 }
 
 func (b SceneURLBuilder) GetSceneMarkerStreamURL(sceneMarkerID int) string {

@@ -38,6 +38,7 @@ type FileReaderWriter interface {
 	file.Finder
 	Query(ctx context.Context, options models.FileQueryOptions) (*models.FileQueryResult, error)
 	GetCaptions(ctx context.Context, fileID file.ID) ([]*models.VideoCaption, error)
+	IsPrimary(ctx context.Context, fileID file.ID) (bool, error)
 }
 
 type FolderReaderWriter interface {
@@ -66,6 +67,10 @@ func (r *Repository) WithTxn(ctx context.Context, fn txn.TxnFunc) error {
 	return txn.WithTxn(ctx, r, fn)
 }
 
+func (r *Repository) WithDB(ctx context.Context, fn txn.TxnFunc) error {
+	return txn.WithDatabase(ctx, r, fn)
+}
+
 func sqliteRepository(d *sqlite.Database) Repository {
 	txnRepo := d.TxnRepository()
 
@@ -87,6 +92,9 @@ func sqliteRepository(d *sqlite.Database) Repository {
 }
 
 type SceneService interface {
+	Create(ctx context.Context, input *models.Scene, fileIDs []file.ID, coverImage []byte) (*models.Scene, error)
+	AssignFile(ctx context.Context, sceneID int, fileID file.ID) error
+	Merge(ctx context.Context, sourceIDs []int, destinationID int, values models.ScenePartial) error
 	Destroy(ctx context.Context, scene *models.Scene, fileDeleter *scene.FileDeleter, deleteGenerated, deleteFile bool) error
 }
 
@@ -96,5 +104,10 @@ type ImageService interface {
 }
 
 type GalleryService interface {
+	AddImages(ctx context.Context, g *models.Gallery, toAdd ...int) error
+	RemoveImages(ctx context.Context, g *models.Gallery, toRemove ...int) error
+
 	Destroy(ctx context.Context, i *models.Gallery, fileDeleter *image.FileDeleter, deleteGenerated, deleteFile bool) ([]*models.Image, error)
+
+	ValidateImageGalleryChange(ctx context.Context, i *models.Image, updateIDs models.UpdateIDs) error
 }

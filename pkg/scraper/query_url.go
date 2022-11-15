@@ -36,9 +36,11 @@ func queryURLParametersFromScrapedScene(scene ScrapedSceneInput) queryURLParamet
 	}
 
 	setField("title", scene.Title)
+	setField("code", scene.Code)
 	setField("url", scene.URL)
 	setField("date", scene.Date)
 	setField("details", scene.Details)
+	setField("director", scene.Director)
 	setField("remote_site_id", scene.RemoteSiteID)
 	return ret
 }
@@ -51,7 +53,7 @@ func queryURLParameterFromURL(url string) queryURLParameters {
 
 func queryURLParametersFromGallery(gallery *models.Gallery) queryURLParameters {
 	ret := make(queryURLParameters)
-	ret["checksum"] = gallery.Checksum()
+	ret["checksum"] = gallery.PrimaryChecksum()
 
 	if gallery.Path != "" {
 		ret["filename"] = filepath.Base(gallery.Path)

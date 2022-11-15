@@ -54,6 +54,7 @@
     "import": "Import…",
     "import_from_file": "Import from file",
     "logout": "Log out",
+    "make_primary": "Make Primary",
     "merge": "Merge",
     "merge_from": "Merge from",
     "merge_into": "Merge into",
@@ -66,6 +67,7 @@
     "play_selected": "Play selected",
     "preview": "Preview",
     "previous_action": "Back",
+    "reassign": "Reassign",
     "refresh": "Refresh",
     "reload_plugins": "Reload plugins",
     "reload_scrapers": "Reload scrapers",
@@ -97,11 +99,13 @@
     "set_image": "Set image…",
     "show": "Show",
     "show_configuration": "Show Configuration",
+    "split": "Split",
     "skip": "Skip",
     "stop": "Stop",
     "submit": "Submit",
     "submit_stash_box": "Submit to Stash-Box",
     "submit_update": "Submit update",
+    "swap": "Swap",
     "tasks": {
       "clean_confirm_message": "Are you sure you want to Clean? This will delete database information and generated content for all scenes and galleries that are no longer found in the filesystem.",
       "dry_mode_selected": "Dry Mode selected. No actual deleting will take place, only logging.",
@@ -244,6 +248,10 @@
         "username": "Username",
         "username_desc": "Username to access Stash. Leave blank to disable user authentication"
       },
+      "backup_directory_path": {
+        "description": "Directory location for SQLite database file backups",
+        "heading": "Backup Directory Path"
+      },
       "cache_location": "Directory location of the cache",
       "cache_path_head": "Cache Path",
       "calculate_md5_and_ohash_desc": "Calculate MD5 checksum in addition to oshash. Enabling will cause initial scans to be slower. File naming hash must be set to oshash to disable MD5 calculation.",
@@ -345,7 +353,7 @@
       "auto_tagging": "Auto Tagging",
       "backing_up_database": "Backing up database",
       "backup_and_download": "Performs a backup of the database and downloads the resulting file.",
-      "backup_database": "Performs a backup of the database to the same directory as the database, with the filename format {filename_format}",
+      "backup_database": "Performs a backup of the database to the backups directory, with the filename format {filename_format}",
       "cleanup_desc": "Check for missing files and remove them from the database. This is a destructive action.",
       "data_management": "Data management",
       "defaults_set": "Defaults have been set and will be used when clicking the {action} button on the Tasks page.",
@@ -427,6 +435,11 @@
         "heading": "Custom CSS",
         "option_label": "Custom CSS enabled"
       },
+      "custom_locales": {
+        "description": "Override individual locale strings. See https://github.com/stashapp/stash/blob/develop/ui/v2.5/src/locales/en-GB.json for the master list. Page must be reloaded for changes to take effect.",
+        "heading": "Custom localisation",
+        "option_label": "Custom localisation enabled"
+      },
       "delete_options": {
         "description": "Default settings when deleting images, galleries, and scenes.",
         "heading": "Delete Options",
@@ -447,7 +460,28 @@
           "description": "Remove the ability to create new objects from the dropdown selectors",
           "heading": "Disable dropdown create"
         },
+        "rating_system": {
+          "type": {
+            "label": "Rating System Type",
+            "options": {
+              "stars": "Stars",
+              "decimal": "Decimal"
+            }
+          },
+          "star_precision": {
+            "label": "Rating Star Precision",
+            "options": {
+              "full": "Full",
+              "half": "Half",
+              "quarter": "Quarter"
+            }
+          }
+        },
         "heading": "Editing"
+      },
+      "abbreviate_counters": {
+        "description": "Abbreviate counters in cards and details view pages, for example \"1831\" will get formated to \"1.8K\".",
+        "heading": "Abbreviate counters"
       },
       "funscript_offset": {
         "description": "Time offset in milliseconds for interactive scripts playback.",
@@ -491,6 +525,10 @@
         "description": "Show or hide different types of content on the navigation bar",
         "heading": "Menu Items"
       },
+      "show_tag_card_on_hover": {
+        "description": "Show tag card when hovering tag badges",
+        "heading": "Tag card tooltips"
+      },
       "performers": {
         "options": {
           "image_location": {
@@ -519,7 +557,7 @@
         "options": {
           "auto_start_video": "Auto-start video",
           "auto_start_video_on_play_selected": {
-            "description": "Auto-start scene videos when playing selected or random from Scenes page",
+            "description": "Auto-start scene videos when playing from queue, or playing selected or random from Scenes page",
             "heading": "Auto-start video when playing selected"
           },
           "continue_playlist_default": {
@@ -543,6 +581,24 @@
       "slideshow_delay": {
         "description": "Slideshow is available in galleries when in wall view mode",
         "heading": "Slideshow Delay (seconds)"
+      },
+      "tag_panel": {
+        "heading": "Tag view",
+        "options": {
+          "show_child_tagged_content": {
+            "description": "In the tag view, display content from the subtags as well",
+            "heading": "Display subtag content"
+          }
+        }
+      },
+      "studio_panel": {
+        "heading": "Studio view",
+        "options": {
+          "show_child_studio_content": {
+            "description": "In the studio view, display content from the sub-studios as well",
+            "heading": "Display sub-studios content"
+          }
+        }
       },
       "title": "User Interface"
     }
@@ -588,14 +644,17 @@
   "death_date": "Death Date",
   "death_year": "Death Year",
   "descending": "Descending",
+  "description": "Description",
   "detail": "Detail",
   "details": "Details",
   "developmentVersion": "Development Version",
   "dialogs": {
     "aliases_must_be_unique": "aliases must be unique",
+    "create_new_entity": "Create new {entity}",
     "delete_alert": "The following {count, plural, one {{singularEntity}} other {{pluralEntity}}} will be deleted permanently:",
     "delete_confirm": "Are you sure you want to delete {entityName}?",
     "delete_entity_desc": "{count, plural, one {Are you sure you want to delete this {singularEntity}? Unless the file is also deleted, this {singularEntity} will be re-added when scan is performed.} other {Are you sure you want to delete these {pluralEntity}? Unless the files are also deleted, these {pluralEntity} will be re-added when scan is performed.}}",
+    "delete_entity_simple_desc": "{count, plural, one {Are you sure you want to delete this {singularEntity}?} other {Are you sure you want to delete these {pluralEntity}?}}",
     "delete_entity_title": "{count, plural, one {Delete {singularEntity}} other {Delete {pluralEntity}}}",
     "delete_galleries_extra": "…plus any image files not attached to any other gallery.",
     "delete_gallery_files": "Delete gallery folder/zip file and any images not attached to any other gallery.",
@@ -627,11 +686,20 @@
         "zoom": "Zoom"
       }
     },
+    "merge": {
+      "destination": "Destination",
+      "empty_results": "Destination field values will be unchanged.",
+      "source": "Source"
+    },
     "merge_tags": {
       "destination": "Destination",
       "source": "Source"
     },
     "overwrite_filter_confirm": "Are you sure you want to overwrite existing saved query {entityName}?",
+    "reassign_entity_title": "{count, plural, one {Reassign {singularEntity}} other {Reassign {pluralEntity}}}",
+    "reassign_files": {
+      "destination": "Reassign to"
+    },
     "scene_gen": {
       "force_transcodes": "Force Transcode generation",
       "force_transcodes_tooltip": "By default, transcodes are only generated when the video file is not supported in the browser. When enabled, transcodes will be generated even when the video file appears to be supported in the browser.",
@@ -769,6 +837,7 @@
   },
   "hasMarkers": "Has Markers",
   "height": "Height",
+  "height_cm": "Height (cm)",
   "help": "Help",
   "ignore_auto_tag": "Ignore Auto Tag",
   "image": "Image",
@@ -869,6 +938,7 @@
   },
   "performers": "Performers",
   "piercings": "Piercings",
+  "primary_file": "Primary file",
   "queue": "Queue",
   "random": "Random",
   "rating": "Rating",
@@ -877,8 +947,12 @@
   "release_notes": "Release Notes",
   "resolution": "Resolution",
   "scene": "Scene",
+  "scene_date": "Date of Scene",
+  "scene_created_at": "Scene Created At",
+  "scene_updated_at": "Scene Updated At",
   "sceneTagger": "Scene Tagger",
   "sceneTags": "Scene Tags",
+  "scene_code": "Studio Code",
   "scene_count": "Scene Count",
   "scene_id": "Scene ID",
   "scenes": "Scenes",
@@ -1007,8 +1081,10 @@
     "default_filter_set": "Default filter set",
     "delete_past_tense": "Deleted {count, plural, one {{singularEntity}} other {{pluralEntity}}}",
     "generating_screenshot": "Generating screenshot…",
+    "merged_scenes": "Merged scenes",
     "merged_tags": "Merged tags",
     "rescanning_entity": "Rescanning {count, plural, one {{singularEntity}} other {{pluralEntity}}}…",
+    "reassign_past_tense": "File reassigned",
     "removed_entity": "Removed {count, plural, one {{singularEntity}} other {{pluralEntity}}}",
     "saved_entity": "Saved {entity}",
     "started_auto_tagging": "Started auto tagging",
@@ -1025,6 +1101,7 @@
   "videos": "Videos",
   "view_all": "View All",
   "weight": "Weight",
+  "weight_kg": "Weight (kg)",
   "years_old": "years old",
   "zip_file_count": "Zip File Count"
 }

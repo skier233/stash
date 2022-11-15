@@ -169,6 +169,9 @@ func initialize() error {
 
 	db := sqlite.NewDatabase()
 
+	// start with empty paths
+	emptyPaths := paths.Paths{}
+
 	instance = &Manager{
 		Config:          cfg,
 		Logger:          l,
@@ -178,14 +181,18 @@ func initialize() error {
 
 		Database:   db,
 		Repository: sqliteRepository(db),
+		Paths:      &emptyPaths,
 
 		scanSubs: &subscriptionManager{},
 	}
 
 	instance.SceneService = &scene.Service{
-		File:            db.File,
-		Repository:      db.Scene,
-		MarkerDestroyer: instance.Repository.SceneMarker,
+		File:             db.File,
+		Repository:       db.Scene,
+		MarkerRepository: instance.Repository.SceneMarker,
+		PluginCache:      instance.PluginCache,
+		Paths:            instance.Paths,
+		Config:           cfg,
 	}
 
 	instance.ImageService = &image.Service{
@@ -444,7 +451,7 @@ func (s *Manager) PostInit(ctx context.Context) error {
 		logger.Warnf("could not set initial configuration: %v", err)
 	}
 
-	s.Paths = paths.NewPaths(s.Config.GetGeneratedPath())
+	*s.Paths = paths.NewPaths(s.Config.GetGeneratedPath())
 	s.RefreshConfig()
 	s.SessionStore = session.NewStore(s.Config)
 	s.PluginCache.RegisterSessionStore(s.SessionStore)
@@ -484,10 +491,6 @@ func (s *Manager) PostInit(ctx context.Context) error {
 		return err
 	}
 
-	if database.Ready() == nil {
-		s.PostMigrate(ctx)
-	}
-
 	return nil
 }
 
@@ -522,7 +525,7 @@ func (s *Manager) initScraperCache() *scraper.Cache {
 }
 
 func (s *Manager) RefreshConfig() {
-	s.Paths = paths.NewPaths(s.Config.GetGeneratedPath())
+	*s.Paths = paths.NewPaths(s.Config.GetGeneratedPath())
 	config := s.Config
 	if config.Validate() == nil {
 		if err := fsutil.EnsureDir(s.Paths.Generated.Screenshots); err != nil {
@@ -649,7 +652,14 @@ func (s *Manager) Migrate(ctx context.Context, input MigrateInput) error {
 	// migration fails
 	backupPath := input.BackupPath
 	if backupPath == "" {
-		backupPath = database.DatabaseBackupPath()
+		backupPath = database.DatabaseBackupPath(s.Config.GetBackupDirectoryPath())
+	} else {
+		// check if backup path is a filename or path
+		// filename goes into backup directory, path is kept as is
+		filename := filepath.Base(backupPath)
+		if backupPath == filename {
+			backupPath = filepath.Join(s.Config.GetBackupDirectoryPathOrDefault(), filename)
+		}
 	}
 
 	// perform database backup
@@ -670,9 +680,6 @@ func (s *Manager) Migrate(ctx context.Context, input MigrateInput) error {
 
 		return errors.New(errStr)
 	}
-
-	// perform post-migration operations
-	s.PostMigrate(ctx)
 
 	// if no backup path was provided, then delete the created backup
 	if input.BackupPath == "" {

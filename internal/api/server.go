@@ -122,7 +122,9 @@ func Start() error {
 
 	// register GQL handler with plugin cache
 	// chain the visited plugin handler
-	manager.GetInstance().PluginCache.RegisterGQLHandler(visitedPluginHandler(http.HandlerFunc(gqlHandlerFunc)))
+	// also requires the dataloader middleware
+	gqlHandler := visitedPluginHandler(dataloaders.Middleware(http.HandlerFunc(gqlHandlerFunc)))
+	manager.GetInstance().PluginCache.RegisterGQLHandler(gqlHandler)
 
 	r.HandleFunc("/graphql", gqlHandlerFunc)
 	r.HandleFunc("/playground", gqlPlayground.Handler("GraphQL playground", "/graphql"))
@@ -178,6 +180,19 @@ func Start() error {
 		}
 
 		http.ServeFile(w, r, fn)
+	})
+	r.HandleFunc("/customlocales", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if c.GetCustomLocalesEnabled() {
+			// search for custom-locales.json in current directory, then $HOME/.stash
+			fn := c.GetCustomLocalesPath()
+			exists, _ := fsutil.FileExists(fn)
+			if exists {
+				http.ServeFile(w, r, fn)
+				return
+			}
+		}
+		_, _ = w.Write([]byte("{}"))
 	})
 
 	r.HandleFunc("/login*", func(w http.ResponseWriter, r *http.Request) {
@@ -278,6 +293,11 @@ func Start() error {
 		Addr:      address,
 		Handler:   r,
 		TLSConfig: tlsConfig,
+		// disable http/2 support by default
+		// when http/2 is enabled, we are unable to hijack and close
+		// the connection/request. This is necessary to stop running
+		// streams when deleting a scene file.
+		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 	}
 
 	printVersion()
@@ -401,11 +421,9 @@ func BaseURLMiddleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		var scheme string
-		if strings.Compare("https", r.URL.Scheme) == 0 || r.Proto == "HTTP/2.0" || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme := "http"
+		if strings.Compare("https", r.URL.Scheme) == 0 || r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 			scheme = "https"
-		} else {
-			scheme = "http"
 		}
 		prefix := getProxyPrefix(r.Header)
 

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
-	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -31,17 +30,18 @@ const (
 )
 
 type galleryRow struct {
-	ID        int               `db:"id" goqu:"skipinsert"`
-	Title     zero.String       `db:"title"`
-	URL       zero.String       `db:"url"`
-	Date      models.SQLiteDate `db:"date"`
-	Details   zero.String       `db:"details"`
-	Rating    null.Int          `db:"rating"`
-	Organized bool              `db:"organized"`
-	StudioID  null.Int          `db:"studio_id,omitempty"`
-	FolderID  null.Int          `db:"folder_id,omitempty"`
-	CreatedAt time.Time         `db:"created_at"`
-	UpdatedAt time.Time         `db:"updated_at"`
+	ID      int               `db:"id" goqu:"skipinsert"`
+	Title   zero.String       `db:"title"`
+	URL     zero.String       `db:"url"`
+	Date    models.SQLiteDate `db:"date"`
+	Details zero.String       `db:"details"`
+	// expressed as 1-100
+	Rating    null.Int               `db:"rating"`
+	Organized bool                   `db:"organized"`
+	StudioID  null.Int               `db:"studio_id,omitempty"`
+	FolderID  null.Int               `db:"folder_id,omitempty"`
+	CreatedAt models.SQLiteTimestamp `db:"created_at"`
+	UpdatedAt models.SQLiteTimestamp `db:"updated_at"`
 }
 
 func (r *galleryRow) fromGallery(o models.Gallery) {
@@ -56,8 +56,8 @@ func (r *galleryRow) fromGallery(o models.Gallery) {
 	r.Organized = o.Organized
 	r.StudioID = intFromPtr(o.StudioID)
 	r.FolderID = nullIntFromFolderIDPtr(o.FolderID)
-	r.CreatedAt = o.CreatedAt
-	r.UpdatedAt = o.UpdatedAt
+	r.CreatedAt = models.SQLiteTimestamp{Timestamp: o.CreatedAt}
+	r.UpdatedAt = models.SQLiteTimestamp{Timestamp: o.UpdatedAt}
 }
 
 type galleryQueryRow struct {
@@ -81,8 +81,8 @@ func (r *galleryQueryRow) resolve() *models.Gallery {
 		StudioID:      nullIntPtr(r.StudioID),
 		FolderID:      nullIntFolderIDPtr(r.FolderID),
 		PrimaryFileID: nullIntFileIDPtr(r.PrimaryFileID),
-		CreatedAt:     r.CreatedAt,
-		UpdatedAt:     r.UpdatedAt,
+		CreatedAt:     r.CreatedAt.Timestamp,
+		UpdatedAt:     r.UpdatedAt.Timestamp,
 	}
 
 	if r.PrimaryFileFolderPath.Valid && r.PrimaryFileBasename.Valid {
@@ -106,8 +106,8 @@ func (r *galleryRowRecord) fromPartial(o models.GalleryPartial) {
 	r.setNullInt("rating", o.Rating)
 	r.setBool("organized", o.Organized)
 	r.setNullInt("studio_id", o.StudioID)
-	r.setTime("created_at", o.CreatedAt)
-	r.setTime("updated_at", o.UpdatedAt)
+	r.setSQLiteTimestamp("created_at", o.CreatedAt)
+	r.setSQLiteTimestamp("updated_at", o.UpdatedAt)
 }
 
 type GalleryStore struct {
@@ -625,6 +625,7 @@ func (qb *GalleryStore) makeFilter(ctx context.Context, galleryFilter *models.Ga
 		query.not(qb.makeFilter(ctx, galleryFilter.Not))
 	}
 
+	query.handleCriterion(ctx, intCriterionHandler(galleryFilter.ID, "galleries.id", nil))
 	query.handleCriterion(ctx, stringCriterionHandler(galleryFilter.Title, "galleries.title"))
 	query.handleCriterion(ctx, stringCriterionHandler(galleryFilter.Details, "galleries.details"))
 
@@ -651,7 +652,9 @@ func (qb *GalleryStore) makeFilter(ctx context.Context, galleryFilter *models.Ga
 
 	query.handleCriterion(ctx, qb.galleryPathCriterionHandler(galleryFilter.Path))
 	query.handleCriterion(ctx, galleryFileCountCriterionHandler(qb, galleryFilter.FileCount))
-	query.handleCriterion(ctx, intCriterionHandler(galleryFilter.Rating, "galleries.rating", nil))
+	query.handleCriterion(ctx, intCriterionHandler(galleryFilter.Rating100, "galleries.rating", nil))
+	// legacy rating handler
+	query.handleCriterion(ctx, rating5CriterionHandler(galleryFilter.Rating, "galleries.rating", nil))
 	query.handleCriterion(ctx, stringCriterionHandler(galleryFilter.URL, "galleries.url"))
 	query.handleCriterion(ctx, boolCriterionHandler(galleryFilter.Organized, "galleries.organized", nil))
 	query.handleCriterion(ctx, galleryIsMissingCriterionHandler(qb, galleryFilter.IsMissing))
@@ -665,6 +668,9 @@ func (qb *GalleryStore) makeFilter(ctx context.Context, galleryFilter *models.Ga
 	query.handleCriterion(ctx, galleryImageCountCriterionHandler(qb, galleryFilter.ImageCount))
 	query.handleCriterion(ctx, galleryPerformerFavoriteCriterionHandler(galleryFilter.PerformerFavorite))
 	query.handleCriterion(ctx, galleryPerformerAgeCriterionHandler(galleryFilter.PerformerAge))
+	query.handleCriterion(ctx, dateCriterionHandler(galleryFilter.Date, "galleries.date"))
+	query.handleCriterion(ctx, timestampCriterionHandler(galleryFilter.CreatedAt, "galleries.created_at"))
+	query.handleCriterion(ctx, timestampCriterionHandler(galleryFilter.UpdatedAt, "galleries.updated_at"))
 
 	return query
 }
@@ -720,7 +726,8 @@ func (qb *GalleryStore) makeQuery(ctx context.Context, galleryFilter *models.Gal
 		)
 
 		// add joins for files and checksum
-		searchColumns := []string{"galleries.title", "gallery_folder.path", "folders.path", "files.basename", "files_fingerprints.fingerprint"}
+		filepathColumn := "folders.path || '" + string(filepath.Separator) + "' || files.basename"
+		searchColumns := []string{"galleries.title", "gallery_folder.path", filepathColumn, "files_fingerprints.fingerprint"}
 		query.parseQueryString(searchColumns, *q)
 	}
 
@@ -786,12 +793,12 @@ func (qb *GalleryStore) galleryPathCriterionHandler(c *models.StringCriterionInp
 			if modifier := c.Modifier; c.Modifier.IsValid() {
 				switch modifier {
 				case models.CriterionModifierIncludes:
-					clause := getPathSearchClause(pathColumn, basenameColumn, c.Value, addWildcards, not)
+					clause := getPathSearchClauseMany(pathColumn, basenameColumn, c.Value, addWildcards, not)
 					clause2 := getStringSearchClause([]string{folderPathColumn}, c.Value, false)
 					f.whereClauses = append(f.whereClauses, orClauses(clause, clause2))
 				case models.CriterionModifierExcludes:
 					not = true
-					clause := getPathSearchClause(pathColumn, basenameColumn, c.Value, addWildcards, not)
+					clause := getPathSearchClauseMany(pathColumn, basenameColumn, c.Value, addWildcards, not)
 					clause2 := getStringSearchClause([]string{folderPathColumn}, c.Value, true)
 					f.whereClauses = append(f.whereClauses, orClauses(clause, clause2))
 				case models.CriterionModifierEquals:
@@ -810,22 +817,24 @@ func (qb *GalleryStore) galleryPathCriterionHandler(c *models.StringCriterionInp
 						f.setError(err)
 						return
 					}
-					clause := makeClause(fmt.Sprintf("(%s IS NOT NULL AND %[1]s regexp ?) OR (%s IS NOT NULL AND %[2]s regexp ?)", pathColumn, basenameColumn), c.Value, c.Value)
-					clause2 := makeClause(fmt.Sprintf("(%s IS NOT NULL AND %[1]s regexp ?)", folderPathColumn), c.Value)
+					filepathColumn := fmt.Sprintf("%s || '%s' || %s", pathColumn, string(filepath.Separator), basenameColumn)
+					clause := makeClause(fmt.Sprintf("%s IS NOT NULL AND %s IS NOT NULL AND %s regexp ?", pathColumn, basenameColumn, filepathColumn), c.Value)
+					clause2 := makeClause(fmt.Sprintf("%s IS NOT NULL AND %[1]s regexp ?", folderPathColumn), c.Value)
 					f.whereClauses = append(f.whereClauses, orClauses(clause, clause2))
 				case models.CriterionModifierNotMatchesRegex:
 					if _, err := regexp.Compile(c.Value); err != nil {
 						f.setError(err)
 						return
 					}
-					f.addWhere(fmt.Sprintf("(%s IS NULL OR %[1]s NOT regexp ?) AND (%s IS NULL OR %[2]s NOT regexp ?)", pathColumn, basenameColumn), c.Value, c.Value)
-					f.addWhere(fmt.Sprintf("(%s IS NULL OR %[1]s NOT regexp ?)", folderPathColumn), c.Value)
+					filepathColumn := fmt.Sprintf("%s || '%s' || %s", pathColumn, string(filepath.Separator), basenameColumn)
+					f.addWhere(fmt.Sprintf("%s IS NULL OR %s IS NULL OR %s NOT regexp ?", pathColumn, basenameColumn, filepathColumn), c.Value)
+					f.addWhere(fmt.Sprintf("%s IS NULL OR %[1]s NOT regexp ?", folderPathColumn), c.Value)
 				case models.CriterionModifierIsNull:
-					f.whereClauses = append(f.whereClauses, makeClause(fmt.Sprintf("(%s IS NULL OR TRIM(%[1]s) = '' OR %s IS NULL OR TRIM(%[2]s) = '')", pathColumn, basenameColumn)))
-					f.whereClauses = append(f.whereClauses, makeClause(fmt.Sprintf("(%s IS NULL OR TRIM(%[1]s) = '')", folderPathColumn)))
+					f.addWhere(fmt.Sprintf("%s IS NULL OR TRIM(%[1]s) = '' OR %s IS NULL OR TRIM(%[2]s) = ''", pathColumn, basenameColumn))
+					f.addWhere(fmt.Sprintf("%s IS NULL OR TRIM(%[1]s) = ''", folderPathColumn))
 				case models.CriterionModifierNotNull:
-					clause := makeClause(fmt.Sprintf("(%s IS NOT NULL AND TRIM(%[1]s) != '' AND %s IS NOT NULL AND TRIM(%[2]s) != '')", pathColumn, basenameColumn))
-					clause2 := makeClause(fmt.Sprintf("(%s IS NOT NULL AND TRIM(%[1]s) != '')", folderPathColumn))
+					clause := makeClause(fmt.Sprintf("%s IS NOT NULL AND TRIM(%[1]s) != '' AND %s IS NOT NULL AND TRIM(%[2]s) != ''", pathColumn, basenameColumn))
+					clause2 := makeClause(fmt.Sprintf("%s IS NOT NULL AND TRIM(%[1]s) != ''", folderPathColumn))
 					f.whereClauses = append(f.whereClauses, orClauses(clause, clause2))
 				default:
 					panic("unsupported string filter modifier")
@@ -939,7 +948,6 @@ func galleryStudioCriterionHandler(qb *GalleryStore, studios *models.Hierarchica
 		primaryTable: galleryTable,
 		foreignTable: studioTable,
 		foreignFK:    studioIDColumn,
-		derivedTable: "studio",
 		parentFK:     "parent_id",
 	}
 
@@ -1066,6 +1074,20 @@ func (qb *GalleryStore) setGallerySort(query *queryBuilder, findFilter *models.F
 		)
 	}
 
+	addFolderTable := func() {
+		query.addJoins(
+			join{
+				table:    folderTable,
+				onClause: "folders.id = galleries.folder_id",
+			},
+			join{
+				table:    folderTable,
+				as:       "file_folder",
+				onClause: "files.parent_folder_id = file_folder.id",
+			},
+		)
+	}
+
 	switch sort {
 	case "file_count":
 		query.sortAndPagination += getCountSort(galleryTable, galleriesFilesTable, galleryIDColumn, direction)
@@ -1078,22 +1100,16 @@ func (qb *GalleryStore) setGallerySort(query *queryBuilder, findFilter *models.F
 	case "path":
 		// special handling for path
 		addFileTable()
-		query.addJoins(
-			join{
-				table:    folderTable,
-				onClause: "folders.id = galleries.folder_id",
-			},
-			join{
-				table:    folderTable,
-				as:       "file_folder",
-				onClause: "files.parent_folder_id = file_folder.id",
-			},
-		)
+		addFolderTable()
 		query.sortAndPagination += fmt.Sprintf(" ORDER BY folders.path %s, file_folder.path %[1]s, files.basename %[1]s", direction)
 	case "file_mod_time":
 		sort = "mod_time"
 		addFileTable()
 		query.sortAndPagination += getSort(sort, direction, fileTable)
+	case "title":
+		addFileTable()
+		addFolderTable()
+		query.sortAndPagination += " ORDER BY galleries.title COLLATE NATURAL_CS " + direction + ", folders.path " + direction + ", file_folder.path " + direction + ", files.basename COLLATE NATURAL_CS " + direction
 	default:
 		query.sortAndPagination += getSort(sort, direction, "galleries")
 	}
@@ -1136,7 +1152,9 @@ func (qb *GalleryStore) tagsRepository() *joinRepository {
 			tableName: galleriesTagsTable,
 			idColumn:  galleryIDColumn,
 		},
-		fkColumn: "tag_id",
+		fkColumn:     "tag_id",
+		foreignTable: tagTable,
+		orderBy:      "tags.name ASC",
 	}
 }
 
@@ -1157,6 +1175,14 @@ func (qb *GalleryStore) imagesRepository() *joinRepository {
 
 func (qb *GalleryStore) GetImageIDs(ctx context.Context, galleryID int) ([]int, error) {
 	return qb.imagesRepository().getIDs(ctx, galleryID)
+}
+
+func (qb *GalleryStore) AddImages(ctx context.Context, galleryID int, imageIDs ...int) error {
+	return qb.imagesRepository().insertOrIgnore(ctx, galleryID, imageIDs...)
+}
+
+func (qb *GalleryStore) RemoveImages(ctx context.Context, galleryID int, imageIDs ...int) error {
+	return qb.imagesRepository().destroyJoins(ctx, galleryID, imageIDs...)
 }
 
 func (qb *GalleryStore) UpdateImages(ctx context.Context, galleryID int, imageIDs []int) error {

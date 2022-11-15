@@ -261,7 +261,10 @@ func (t *ExportTask) zipWalkFunc(outDir string, z *zip.Writer) filepath.WalkFunc
 func (t *ExportTask) zipFile(fn, outDir string, z *zip.Writer) error {
 	bn := filepath.Base(fn)
 
-	f, err := z.Create(filepath.Join(outDir, bn))
+	p := filepath.Join(outDir, bn)
+	p = filepath.ToSlash(p)
+
+	f, err := z.Create(p)
 	if err != nil {
 		return fmt.Errorf("error creating zip entry for %s: %s", fn, err.Error())
 	}
@@ -335,7 +338,7 @@ func (t *ExportTask) populateGalleryImages(ctx context.Context, repo Repository)
 
 		images, err := imageReader.FindByGalleryID(ctx, g.ID)
 		if err != nil {
-			logger.Errorf("[galleries] <%s> failed to fetch images for gallery: %s", g.Checksum(), err.Error())
+			logger.Errorf("[galleries] <%s> failed to fetch images for gallery: %s", g.PrimaryChecksum(), err.Error())
 			continue
 		}
 
@@ -580,7 +583,7 @@ func exportScene(ctx context.Context, wg *sync.WaitGroup, jobChan <-chan *models
 		basename := filepath.Base(s.Path)
 		hash := s.OSHash
 
-		fn := newSceneJSON.Filename(basename, hash)
+		fn := newSceneJSON.Filename(s.ID, basename, hash)
 
 		if err := t.json.saveScene(fn, newSceneJSON); err != nil {
 			logger.Errorf("[scenes] <%s> failed to save json: %s", sceneHash, err.Error())
@@ -765,7 +768,7 @@ func exportGallery(ctx context.Context, wg *sync.WaitGroup, jobChan <-chan *mode
 			continue
 		}
 
-		galleryHash := g.Checksum()
+		galleryHash := g.PrimaryChecksum()
 
 		newGalleryJSON, err := gallery.ToBasicJSON(g)
 		if err != nil {
